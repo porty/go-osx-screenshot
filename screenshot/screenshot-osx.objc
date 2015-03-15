@@ -1,0 +1,82 @@
+
+// not sure if pragma is needed
+#pragma once
+
+#import <Cocoa/Cocoa.h>
+
+CGDirectDisplayID displays[10];
+CGDisplayCount displayCount;
+
+const int ERR_OK = 0;
+const int ERR_COULD_NOT_GET_ACTIVE_DISPLAY_LIST = 100;
+const int ERR_COULD_NOT_GET_UTT = 101;
+const int ERR_COULD_NOT_GET_DESTINATION = 102;
+const int ERR_COULD_NOT_FINALIZE_IMAGE = 103;
+const int ERR_COULD_NOT_DISPLAY_CREATE_IMAGE = 104;
+
+const int FORMAT_JPEG = 1;
+const int FORMAT_PNG = 2;
+
+int updateDisplayList() {
+	CGError err = CGGetActiveDisplayList(
+		sizeof(displays) / sizeof(CGDirectDisplayID),
+		displays,
+		&displayCount
+	);
+
+	if(err != CGDisplayNoErr) {
+		printf("Call to CGGetActiveDisplayList() failed, returned %d\n", err);
+		return ERR_COULD_NOT_GET_ACTIVE_DISPLAY_LIST;
+	}
+	return ERR_OK;
+}
+
+NSURL * getURLFromCString(const char * const str) {
+	NSString * path = [NSString stringWithUTF8String:str];
+	NSURL *url = [NSURL fileURLWithPath: path];
+	return url;
+}
+
+int saveScreenshotToFile(int maxDisplays, int saveFormat, char * destinationPath) {
+	@autoreleasepool {
+		int err = updateDisplayList();
+		if (err != ERR_OK) {
+			return err;
+		}
+
+		CGImageRef image = CGDisplayCreateImage(displays[0]);
+		if (!image) {
+			printf("Call to CGDisplayCreateImage() failed, possibly passed in an invalid display ID\n");
+			return ERR_COULD_NOT_DISPLAY_CREATE_IMAGE;
+		}
+
+		NSURL *url = getURLFromCString(destinationPath);
+
+		CGImageDestinationRef dest;
+		dest = CGImageDestinationCreateWithURL(
+			(CFURLRef)url,
+			saveFormat == FORMAT_JPEG ? kUTTypeJPEG : kUTTypePNG,
+			1,
+			nil
+		);
+
+		if (!dest) {
+			CFRelease(image);
+			printf("Call to CGImageDestinationCreateWithURL() failed\n");
+			return ERR_COULD_NOT_GET_DESTINATION;
+		}
+
+		CGImageDestinationAddImage(dest, image, nil);
+		if (!CGImageDestinationFinalize(dest)) {
+			CFRelease(image);
+			CFRelease(dest);
+			printf("Call to CGImageDestinationFinalize() failed (path of %s)\n", destinationPath);
+			return ERR_COULD_NOT_FINALIZE_IMAGE;
+		}
+
+		CFRelease(dest);
+		CFRelease(image);
+
+		return ERR_OK;
+	}
+}
