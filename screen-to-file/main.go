@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/porty/go-osx-screenshot/screenshot"
+	screenshot "github.com/porty/go-osx-screenshot"
 )
 
 func main() {
